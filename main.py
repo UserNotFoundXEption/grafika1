@@ -3,11 +3,12 @@ import pygame
 
 
 class Camera:
-    def __init__(self, position=(0.0, 0.0, -5.0), pitch=0.0, yaw=0.0, roll=0.0):
+    def __init__(self, position=(0.0, 0.0, -5.0), pitch=0.0, yaw=0.0, roll=0.0, focal_length = 1.0):
         self.position = np.array(position)
         self.pitch = pitch
         self.yaw = yaw
         self.roll = roll
+        self.focal_length = focal_length
 
     def move(self, dx, dy, dz):
         move_speed_scale = 0.25
@@ -19,8 +20,13 @@ class Camera:
         self.yaw += dyaw * rotation_speed_scale
         self.roll += droll * rotation_speed_scale
 
+    def zoom(self, zoom_factor):
+        self.focal_length += zoom_factor
+        if self.focal_length < 1.0:
+            self.focal_length = 1.0
 
-def project_to_2d(point, width, height, focal_length=1):
+
+def project_to_2d(point, focal_length=1):
     x, y, z = point
     if z == 0:
         z = 0.0001
@@ -121,8 +127,8 @@ def draw_cube(camera, screen, width, height):
         vertices = np.dot(vertices, rotation_matrix.T)
 
         for edge in edges:
-            start = project_to_2d(vertices[edge[0]], width, height)
-            end = project_to_2d(vertices[edge[1]], width, height)
+            start = project_to_2d(vertices[edge[0]], camera.focal_length)
+            end = project_to_2d(vertices[edge[1]], camera.focal_length)
 
             start_z = vertices[edge[0]][2]
             end_z = vertices[edge[1]][2]
@@ -163,6 +169,11 @@ def handle_keyboard_input(camera):
         camera.rotate(0.0, 0.0, 1.0)
     if keys[pygame.K_q]:
         camera.rotate(0.0, 0.0, -1.0)
+
+    if keys[pygame.K_PLUS] or keys[pygame.K_EQUALS]:
+        camera.zoom(0.1)
+    if keys[pygame.K_MINUS]:
+        camera.zoom(-0.1)
 
 
 pygame.init()
