@@ -3,27 +3,51 @@ import pygame
 
 
 class Camera:
-    def __init__(self, position=(0.0, 0.0, -5.0), pitch=0.0, yaw=0.0, roll=0.0, focal_length = 1.0):
+    def __init__(self, position=(0.0, 0.0, -5.0), focal_length=1.0):
         self.position = np.array(position)
-        self.pitch = pitch
-        self.yaw = yaw
-        self.roll = roll
+        self.rotation_matrix = np.identity(3)
         self.focal_length = focal_length
 
     def move(self, dx, dy, dz):
         move_speed_scale = 0.25
-        self.position += np.array([dx * move_speed_scale, dy * move_speed_scale, dz * move_speed_scale])
+        direction = np.array([dx, dy, dz]) * move_speed_scale
+        direction = self.rotation_matrix.T @ direction
+        self.position += direction
 
-    def rotate(self, dpitch, dyaw, droll):
-        rotation_speed_scale = 0.5
-        self.pitch += dpitch * rotation_speed_scale
-        self.yaw += dyaw * rotation_speed_scale
-        self.roll += droll * rotation_speed_scale
+    def rotate(self, dx, dy, dz):
+        rotation_speed_scale = 1
+        delta = np.radians(np.array([dx, dy, dz]) * rotation_speed_scale)
+
+        rot_pitch = np.array([
+            [1, 0, 0],
+            [0, np.cos(delta[0]), -np.sin(delta[0])],
+            [0, np.sin(delta[0]), np.cos(delta[0])]
+        ])
+
+        rot_yaw = np.array([
+            [np.cos(delta[1]), 0, np.sin(delta[1])],
+            [0, 1, 0],
+            [-np.sin(delta[1]), 0, np.cos(delta[1])]
+        ])
+
+        rot_roll = np.array([
+            [np.cos(delta[2]), -np.sin(delta[2]), 0],
+            [np.sin(delta[2]), np.cos(delta[2]), 0],
+            [0, 0, 1]
+        ])
+
+        delta_matrix = rot_roll @ rot_pitch @ rot_yaw
+        self.rotation_matrix = delta_matrix @ self.rotation_matrix
 
     def zoom(self, zoom_factor):
         self.focal_length += zoom_factor
         if self.focal_length < 1.0:
             self.focal_length = 1.0
+
+    def reset(self):
+        self.position = [0.0, 0.0, -5.0]
+        self.rotation_matrix = np.identity(3)
+        self.focal_length = 1.0
 
 
 def project_to_2d(point, focal_length=1):
@@ -96,34 +120,7 @@ def draw_cube(camera, screen, width, height):
 
     for vertices in ver_all:
         vertices -= camera.position
-
-        cos_yaw = np.cos(np.radians(camera.yaw))
-        sin_yaw = np.sin(np.radians(camera.yaw))
-        cos_pitch = np.cos(np.radians(camera.pitch))
-        sin_pitch = np.sin(np.radians(camera.pitch))
-        cos_roll = np.cos(np.radians(camera.roll))
-        sin_roll = np.sin(np.radians(camera.roll))
-
-        rotation_yaw = np.array([
-            [cos_yaw, 0, sin_yaw],
-            [0, 1, 0],
-            [-sin_yaw, 0, cos_yaw]
-        ])
-
-        rotation_pitch = np.array([
-            [1, 0, 0],
-            [0, cos_pitch, -sin_pitch],
-            [0, sin_pitch, cos_pitch]
-        ])
-
-        rotation_roll = np.array([
-            [cos_roll, -sin_roll, 0],
-            [sin_roll, cos_roll, 0],
-            [0, 0, 1]
-        ])
-
-        rotation_matrix = np.dot(rotation_roll, np.dot(rotation_pitch, rotation_yaw))
-
+        rotation_matrix = camera.rotation_matrix
         vertices = np.dot(vertices, rotation_matrix.T)
 
         for edge in edges:
@@ -174,6 +171,12 @@ def handle_keyboard_input(camera):
         camera.zoom(0.1)
     if keys[pygame.K_MINUS]:
         camera.zoom(-0.1)
+
+    if keys[pygame.K_r]:
+        camera.reset()
+    if keys[pygame.K_p]:
+        pygame.quit()
+        exit()
 
 
 pygame.init()
